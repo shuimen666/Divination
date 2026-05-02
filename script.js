@@ -1,12 +1,16 @@
 const STORAGE_KEY = "divination-history-v1";
 const TOTAL_TOSSES = 6;
-const FLIP_DURATION_MS = 900;
+const COIN_ANIMATION_MS = 1320;
+const COIN_STAGGER_MS = 80;
+const COIN_SPIN_START = 0.03;
+const COIN_SPIN_END = 0.97;
 
 const state = {
   question: "",
   tosses: [],
   currentEntry: null,
-  isCasting: false
+  isCasting: false,
+  animationFrameId: null
 };
 
 const screens = {
@@ -20,6 +24,8 @@ const elements = {
   questionInput: document.getElementById("questionInput"),
   activeQuestion: document.getElementById("activeQuestion"),
   roundLabel: document.getElementById("roundLabel"),
+  coinViewport: document.getElementById("coinViewport"),
+  coinCamera: document.getElementById("coinCamera"),
   castButton: document.getElementById("castButton"),
   restartButton: document.getElementById("restartButton"),
   tossGrid: document.getElementById("tossGrid"),
@@ -44,6 +50,7 @@ const coins = Array.from(document.querySelectorAll(".coin"));
 initialize();
 
 function initialize() {
+  seedCoinRestState();
   renderTossGrid([]);
   bindEvents();
   renderHistory();
@@ -109,7 +116,7 @@ async function handleCast() {
   const results = generateCoinFaces();
   animateCoins(results);
 
-  await wait(FLIP_DURATION_MS);
+  await wait(COIN_ANIMATION_MS + COIN_STAGGER_MS * (coins.length - 1));
 
   const count = results.filter(Boolean).length;
   state.tosses.push(count);
@@ -290,21 +297,70 @@ function updateRoundLabel() {
 }
 
 function animateCoins(results) {
-  coins.forEach((coin, index) => {
+  stopCastAnimation();
+
+  const plans = coins.map((coin, index) => {
     const isYang = results[index];
-    coin.classList.remove("is-flipping");
-    coin.style.setProperty("--final-rotation", `${isYang ? 0 : 180}deg`);
-    void coin.offsetWidth;
-    coin.classList.add("is-flipping");
-    coin.style.transform = `rotateY(${isYang ? 0 : 180}deg)`;
+    const startRotation = Number(coin.dataset.rotation || 0);
+    const finalRotation = isYang ? 0 : 180;
+    const driftX = randomBetween(-12, 12);
+    const lift = randomBetween(270, 345);
+    const arcZ = randomBetween(180, 240);
+    return {
+      coin,
+      startRotation,
+      finalRotation,
+      targetRotation: getForwardRotationTarget(startRotation, finalRotation),
+      driftX,
+      lift,
+      arcZ,
+      bankZ: randomBetween(6, 12),
+      settleBank: getRestZ(index),
+      tiltPeak: randomBetween(-84, -70),
+      startDelay: index * COIN_STAGGER_MS
+    };
   });
+
+  const startedAt = performance.now();
+  const totalDuration = COIN_ANIMATION_MS + COIN_STAGGER_MS * (plans.length - 1);
+
+  const tick = (now) => {
+    const elapsed = now - startedAt;
+    const globalT = clamp(elapsed / totalDuration, 0, 1);
+    applyCameraFrame(globalT);
+
+    plans.forEach((plan) => {
+      const localT = clamp((elapsed - plan.startDelay) / COIN_ANIMATION_MS, 0, 1);
+      applyCoinFrame(plan, localT);
+
+      if (localT === 1) {
+        plan.coin.dataset.rotation = String(plan.finalRotation);
+      }
+    });
+
+    if (elapsed < totalDuration) {
+      state.animationFrameId = window.requestAnimationFrame(tick);
+      return;
+    }
+
+    applyCameraFrame(1);
+    plans.forEach((plan) => {
+      applyCoinRest(plan.coin, plan.finalRotation, plan.settleBank);
+      plan.coin.dataset.rotation = String(plan.finalRotation);
+    });
+    state.animationFrameId = null;
+  };
+
+  state.animationFrameId = window.requestAnimationFrame(tick);
 }
 
 function resetCoinsToNeutral() {
-  coins.forEach((coin) => {
-    coin.classList.remove("is-flipping");
-    coin.style.removeProperty("--final-rotation");
-    coin.style.transform = "rotateY(0deg)";
+  stopCastAnimation();
+  applyCameraRest();
+
+  coins.forEach((coin, index) => {
+    applyCoinRest(coin, 0, getRestZ(index));
+    coin.dataset.rotation = "0";
   });
 }
 
@@ -387,4 +443,98 @@ function wait(duration) {
   return new Promise((resolve) => {
     window.setTimeout(resolve, duration);
   });
+}
+
+function stopCastAnimation() {
+  if (state.animationFrameId !== null) {
+    window.cancelAnimationFrame(state.animationFrameId);
+    state.animationFrameId = null;
+  }
+}
+
+function seedCoinRestState() {
+  resetCoinsToNeutral();
+}
+
+function getRestZ(index) {
+  const rotations = [-7, 5, -4];
+  return rotations[index] ?? 0;
+}
+
+function applyCameraRest() {
+  elements.coinViewport.style.setProperty("--camera-origin-y", "14%");
+  elements.coinCamera.style.setProperty("--camera-tilt", "0deg");
+  elements.coinCamera.style.setProperty("--camera-y", "0px");
+  elements.coinCamera.style.setProperty("--camera-scale", "1");
+}
+
+function applyCameraFrame(progress) {
+  const rise = Math.sin(Math.PI * progress);
+  const tilt = 58 * Math.pow(rise, 1.05);
+  const travel = -52 * Math.pow(rise, 1.2);
+  const scale = 1 + 0.055 * rise;
+  const origin = 14 + 46 * rise;
+
+  elements.coinViewport.style.setProperty("--camera-origin-y", `${origin}%`);
+  elements.coinCamera.style.setProperty("--camera-tilt", `${tilt}deg`);
+  elements.coinCamera.style.setProperty("--camera-y", `${travel}px`);
+  elements.coinCamera.style.setProperty("--camera-scale", scale.toFixed(4));
+}
+
+function applyCoinRest(coin, rotationY, bankZ) {
+  coin.style.setProperty("--coin-x", "0px");
+  coin.style.setProperty("--coin-y", "0px");
+  coin.style.setProperty("--coin-z", "0px");
+  coin.style.setProperty("--coin-tilt-x", "0deg");
+  coin.style.setProperty("--coin-rotation", `${rotationY}deg`);
+  coin.style.setProperty("--coin-bank", `${bankZ}deg`);
+}
+
+function applyCoinFrame(plan, progress) {
+  if (progress <= 0) {
+    applyCoinRest(plan.coin, plan.startRotation, plan.settleBank);
+    return;
+  }
+
+  const arc = Math.sin(Math.PI * progress);
+  const drift = Math.sin(Math.PI * progress);
+  const spinWindow = clamp((progress - COIN_SPIN_START) / (COIN_SPIN_END - COIN_SPIN_START), 0, 1);
+  const spin = easeInOutCubic(spinWindow);
+  const bankFade = 1 - progress;
+  const rotation = mix(plan.startRotation, plan.targetRotation, spin);
+  const tiltX = plan.tiltPeak * Math.pow(arc, 1.05);
+  const bank = mix(plan.bankZ, plan.settleBank, progress) + plan.bankZ * bankFade * 0.25;
+  const x = plan.driftX * drift;
+  const y = -plan.lift * Math.pow(arc, 0.9);
+  const z = plan.arcZ * Math.pow(arc, 1.15);
+
+  plan.coin.style.setProperty("--coin-x", `${x.toFixed(2)}px`);
+  plan.coin.style.setProperty("--coin-y", `${y.toFixed(2)}px`);
+  plan.coin.style.setProperty("--coin-z", `${z.toFixed(2)}px`);
+  plan.coin.style.setProperty("--coin-tilt-x", `${tiltX.toFixed(2)}deg`);
+  plan.coin.style.setProperty("--coin-rotation", `${rotation.toFixed(2)}deg`);
+  plan.coin.style.setProperty("--coin-bank", `${bank.toFixed(2)}deg`);
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function mix(start, end, amount) {
+  return start + (end - start) * amount;
+}
+
+function easeInOutCubic(value) {
+  return value < 0.5
+    ? 4 * value * value * value
+    : 1 - Math.pow(-2 * value + 2, 3) / 2;
+}
+
+function getForwardRotationTarget(startRotation, finalRotation) {
+  const forwardDelta = ((finalRotation - startRotation) % 360 + 360) % 360;
+  return startRotation + 360 + forwardDelta;
+}
+
+function randomBetween(min, max) {
+  return Math.round(Math.random() * (max - min) + min);
 }
