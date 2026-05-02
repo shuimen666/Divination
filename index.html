@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>易经六爻</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="page-shell">
+    <div class="paper paper-left"></div>
+    <div class="paper paper-right"></div>
+
+    <header class="site-header">
+      <div class="site-mark">
+        <span class="site-mark__line"></span>
+        <span class="site-mark__text">六爻占演</span>
+      </div>
+      <button class="history-fab" id="historyFab" type="button" aria-label="打开历史记录">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 8a4 4 0 1 1 0 8a4 4 0 0 1 0-8Zm0-5C6.5 3 2 7.2.4 12c1.6 4.8 6.1 9 11.6 9s10-4.2 11.6-9C22 7.2 17.5 3 12 3Zm0 15c-4.3 0-7.9-2.9-9.4-6c1.5-3.1 5.1-6 9.4-6s7.9 2.9 9.4 6c-1.5 3.1-5.1 6-9.4 6Z"></path>
+        </svg>
+      </button>
+    </header>
+
+    <main class="main-card">
+      <section class="screen screen--active" id="homeScreen" aria-labelledby="pageTitle">
+        <div class="hero-copy">
+          <p class="hero-copy__eyebrow">乾坤流转，六爻成象</p>
+          <h1 id="pageTitle">易经六爻</h1>
+          <p class="hero-copy__desc">
+            写下你此刻想问之事，以三枚铜钱起卦，连续投掷六次，得本卦与变卦。
+          </p>
+        </div>
+
+        <form class="question-form" id="questionForm">
+          <label class="question-form__label" for="questionInput">所问之事</label>
+          <textarea
+            class="question-form__input"
+            id="questionInput"
+            name="question"
+            rows="4"
+            maxlength="120"
+            placeholder="例如：近期工作选择是否适合变动？"
+            required
+          ></textarea>
+          <div class="question-form__footer">
+            <span class="question-form__hint">内容将保存至本地历史记录</span>
+            <button class="ink-button" type="submit">确认起卦</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="screen" id="castingScreen" aria-live="polite">
+        <div class="status-panel">
+          <p class="status-panel__eyebrow">当前所问</p>
+          <h2 class="status-panel__question" id="activeQuestion"></h2>
+          <p class="status-panel__round" id="roundLabel">第一次开始</p>
+        </div>
+
+        <div class="coin-stage" id="coinStage">
+          <div class="coin" data-coin="0">
+            <div class="coin__surface coin__surface--yang">
+              <span class="coin__ring"></span>
+              <span class="coin__square"></span>
+            </div>
+            <div class="coin__surface coin__surface--yin">
+              <span class="coin__ring"></span>
+              <span class="coin__square"></span>
+              <span class="coin__text">恭喜发财</span>
+            </div>
+          </div>
+          <div class="coin" data-coin="1">
+            <div class="coin__surface coin__surface--yang">
+              <span class="coin__ring"></span>
+              <span class="coin__square"></span>
+            </div>
+            <div class="coin__surface coin__surface--yin">
+              <span class="coin__ring"></span>
+              <span class="coin__square"></span>
+              <span class="coin__text">恭喜发财</span>
+            </div>
+          </div>
+          <div class="coin" data-coin="2">
+            <div class="coin__surface coin__surface--yang">
+              <span class="coin__ring"></span>
+              <span class="coin__square"></span>
+            </div>
+            <div class="coin__surface coin__surface--yin">
+              <span class="coin__ring"></span>
+              <span class="coin__square"></span>
+              <span class="coin__text">恭喜发财</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="casting-actions">
+          <button class="ink-button" id="castButton" type="button">开始</button>
+          <button class="ghost-button" id="restartButton" type="button">重新输入</button>
+        </div>
+
+        <section class="toss-log">
+          <div class="toss-log__header">
+            <h3>六次记录</h3>
+            <p>数值按无字面朝上数量计算</p>
+          </div>
+          <div class="toss-log__grid" id="tossGrid"></div>
+        </section>
+      </section>
+
+      <section class="screen" id="resultScreen">
+        <div class="result-header">
+          <div>
+            <p class="result-header__eyebrow">占演结果</p>
+            <h2>卦象已成</h2>
+          </div>
+          <div class="result-header__actions">
+            <button class="ghost-button" id="viewQuestionButton" type="button">查看所问</button>
+            <button class="ink-button" id="newReadingButton" type="button">再次起卦</button>
+          </div>
+        </div>
+
+        <article class="result-question" id="resultQuestionCard">
+          <p class="result-question__label">所问之事</p>
+          <p class="result-question__text" id="resultQuestion"></p>
+        </article>
+
+        <div class="result-layout">
+          <section class="hexagram-card">
+            <p class="hexagram-card__label">本卦</p>
+            <div class="hexagram" id="primaryHexagram"></div>
+            <p class="hexagram-card__name" id="primaryName"></p>
+          </section>
+
+          <section class="hexagram-card">
+            <p class="hexagram-card__label">变卦</p>
+            <div class="hexagram" id="changedHexagram"></div>
+            <p class="hexagram-card__name" id="changedName"></p>
+          </section>
+        </div>
+
+        <section class="summary-card">
+          <div class="summary-card__header">
+            <h3>投掷明细</h3>
+            <p>从左到右为第一次至第六次</p>
+          </div>
+          <div class="summary-card__tokens" id="resultTokens"></div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <div class="history-modal" id="historyModal" aria-hidden="true">
+    <div class="history-modal__backdrop" data-close-history="true"></div>
+    <div class="history-modal__panel" role="dialog" aria-modal="true" aria-labelledby="historyTitle">
+      <div class="history-modal__header">
+        <div>
+          <p class="history-modal__eyebrow">本地保存</p>
+          <h2 id="historyTitle">历史记录</h2>
+        </div>
+        <button class="history-modal__close" id="closeHistoryButton" type="button" aria-label="关闭历史记录">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M18.3 5.7 12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3Z"></path>
+          </svg>
+        </button>
+      </div>
+      <div class="history-list" id="historyList"></div>
+    </div>
+  </div>
+
+  <template id="historyItemTemplate">
+    <article class="history-item">
+      <div class="history-item__content">
+        <p class="history-item__time"></p>
+        <p class="history-item__question"></p>
+      </div>
+      <button class="history-item__view" type="button" aria-label="查看结果">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 8a4 4 0 1 1 0 8a4 4 0 0 1 0-8Zm0-5C6.5 3 2 7.2.4 12c1.6 4.8 6.1 9 11.6 9s10-4.2 11.6-9C22 7.2 17.5 3 12 3Zm0 15c-4.3 0-7.9-2.9-9.4-6c1.5-3.1 5.1-6 9.4-6s7.9 2.9 9.4 6c-1.5 3.1-5.1 6-9.4 6Z"></path>
+        </svg>
+      </button>
+    </article>
+  </template>
+
+  <script src="hexagram-names.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
